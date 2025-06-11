@@ -1021,6 +1021,14 @@
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
 
         async function initializeFirebase() {
+             // FIX: Add check for valid firebaseConfig
+            if (!firebaseConfig || !firebaseConfig.apiKey) {
+                console.error("Firebase configuration is missing or invalid.");
+                showNotification("Firebase config missing. App cannot start.", "error");
+                document.getElementById('userIdDisplay').textContent = 'Config Error';
+                return; // Stop initialization
+            }
+
             try {
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
