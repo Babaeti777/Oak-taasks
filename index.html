@@ -1014,23 +1014,45 @@
         let db, auth, userId, tasksCollectionRef;
         let unsubscribeFromTasks = null; 
         let statusChart, priorityChart;
+        
+        // --- !! IMPORTANT !! ---
+        // --- PASTE YOUR FIREBASE CONFIGURATION HERE ---
+        // To get this configuration:
+        // 1. Go to your Firebase project console.
+        // 2. Click the Web icon (</>) to go to your web app's settings.
+        // 3. In "Project Settings" > "General", scroll down to "Your apps".
+        // 4. Under "Firebase SDK snippet", select the "Config" option.
+        // 5. Copy the entire `firebaseConfig` object and paste it below.
+
+        const firebaseConfig = {
+            // apiKey: "YOUR_API_KEY",
+            // authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            // projectId: "YOUR_PROJECT_ID",
+            // storageBucket: "YOUR_PROJECT_ID.appspot.com",
+            // messagingSenderId: "YOUR_SENDER_ID",
+            // appId: "YOUR_APP_ID"
+        };
+        // --- END OF FIREBASE CONFIGURATION ---
+
 
         // --- FIREBASE INITIALIZATION ---
 
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'eisenhower-matrix-app';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-
+        
         async function initializeFirebase() {
-             // FIX: Add check for valid firebaseConfig
-            if (!firebaseConfig || !firebaseConfig.apiKey) {
+            const finalConfig = (typeof __firebase_config !== 'undefined' && Object.keys(JSON.parse(__firebase_config)).length > 0) 
+                ? JSON.parse(__firebase_config) 
+                : firebaseConfig;
+
+            if (!finalConfig || !finalConfig.apiKey) {
                 console.error("Firebase configuration is missing or invalid.");
                 showNotification("Firebase config missing. App cannot start.", "error");
                 document.getElementById('userIdDisplay').textContent = 'Config Error';
-                return; // Stop initialization
+                return;
             }
 
             try {
-                const app = initializeApp(firebaseConfig);
+                const app = initializeApp(finalConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
                 
@@ -1049,7 +1071,6 @@
                             localTasks = snapshot.docs.map(doc => ({ 
                                 id: doc.id, 
                                 ...doc.data(),
-                                // Convert Firestore Timestamps to JS Dates
                                 dueDate: doc.data().dueDate ? doc.data().dueDate.toDate() : null
                             }));
                             renderTasks();
@@ -1065,8 +1086,7 @@
                         renderTasks();
                         updateAnalytics();
                         document.getElementById('userIdDisplay').textContent = 'Authenticating...';
-                        // Attempt to sign in if not authenticated
-                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                             signInWithCustomToken(auth, __initial_auth_token).catch(e => console.error("Auth token sign in error", e));
                         } else {
                             signInAnonymously(auth).catch(e => console.error("Anonymous sign in error", e));
