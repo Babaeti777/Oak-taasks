@@ -61,6 +61,25 @@
             padding: 20px;
         }
 
+        .hidden {
+            display: none !important;
+        }
+
+        /* Loading Overlay */
+        #loading-overlay {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(10, 10, 20, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            color: white;
+            font-size: 1.25rem;
+            font-weight: 600;
+            backdrop-filter: blur(5px);
+        }
+
         /* Header */
         .header {
             text-align: center;
@@ -781,7 +800,10 @@
     </style>
 </head>
 <body>
-    <div class="container">
+    <div id="loading-overlay">
+        <span>Loading Tasks...</span>
+    </div>
+    <div class="container hidden">
         <!-- Header -->
         <div class="header">
             <h1>🎯 Eisenhower Matrix</h1>
@@ -1017,21 +1039,15 @@
         
         // --- !! IMPORTANT !! ---
         // --- PASTE YOUR FIREBASE CONFIGURATION HERE ---
-        // To get this configuration:
-        // 1. Go to your Firebase project console.
-        // 2. Click the Web icon (</>) to go to your web app's settings.
-        // 3. In "Project Settings" > "General", scroll down to "Your apps".
-        // 4. Under "Firebase SDK snippet", select the "Config" option.
-        // 5. Copy the entire `firebaseConfig` object and paste it below.
-
         const firebaseConfig = {
-    apiKey: "AIzaSyAQpijEgH_RgjnPeTgb-YAVIrSpYOwR8t0",
-    authDomain: "oak-tasks-8a23c.firebaseapp.com",
-    projectId: "oak-tasks-8a23c",
-    storageBucket: "oak-tasks-8a23c.firebasestorage.app",
-    messagingSenderId: "200722220568",
-    appId: "1:200722220568:web:7a379028f4afa00d1ba56d"
-  };
+  apiKey: "AIzaSyAQpijEgH_RgjnPeTgb-YAVIrSpYOwR8t0",
+  authDomain: "oak-tasks-8a23c.firebaseapp.com",
+  projectId: "oak-tasks-8a23c",
+  storageBucket: "oak-tasks-8a23c.firebasestorage.app",
+  messagingSenderId: "200722220568",
+  appId: "1:200722220568:web:7a379028f4afa00d1ba56d"
+};
+
         // --- END OF FIREBASE CONFIGURATION ---
 
 
@@ -1046,8 +1062,8 @@
 
             if (!finalConfig || !finalConfig.apiKey) {
                 console.error("Firebase configuration is missing or invalid.");
+                document.getElementById('loading-overlay').textContent = 'Firebase Config Missing!';
                 showNotification("Firebase config missing. App cannot start.", "error");
-                document.getElementById('userIdDisplay').textContent = 'Config Error';
                 return;
             }
 
@@ -1058,10 +1074,11 @@
                 
                 onAuthStateChanged(auth, user => {
                     if (user) {
+                        if (userId === user.uid) return; // Already initialized for this user
+                        
                         userId = user.uid;
-                        const userIdEl = document.getElementById('userIdDisplay');
-                        userIdEl.textContent = `User ID: ${userId}`;
-                        userIdEl.onclick = () => navigator.clipboard.writeText(userId).then(() => showNotification('User ID copied!', 'success'));
+                        document.getElementById('userIdDisplay').textContent = `User ID: ${userId}`;
+                        document.getElementById('userIdDisplay').onclick = () => navigator.clipboard.writeText(userId).then(() => showNotification('User ID copied!', 'success'));
                         
                         tasksCollectionRef = collection(db, 'artifacts', appId, 'users', userId, 'tasks');
                         
@@ -1075,21 +1092,32 @@
                             }));
                             renderTasks();
                             updateAnalytics();
+                            
+                            // Hide loading overlay once data is loaded for the first time
+                            document.getElementById('loading-overlay').classList.add('hidden');
+                            document.querySelector('.container').classList.remove('hidden');
                         }, (error) => {
                             console.error("Error fetching tasks:", error);
                             showNotification("Could not fetch tasks.", "error");
+                            document.getElementById('loading-overlay').textContent = 'Error Loading Data';
                         });
 
                     } else {
+                        // Keep loading screen active while signing in
                         if (unsubscribeFromTasks) unsubscribeFromTasks();
+                        userId = null;
                         localTasks = [];
-                        renderTasks();
-                        updateAnalytics();
-                        document.getElementById('userIdDisplay').textContent = 'Authenticating...';
+                        
                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            signInWithCustomToken(auth, __initial_auth_token).catch(e => console.error("Auth token sign in error", e));
+                            signInWithCustomToken(auth, __initial_auth_token).catch(e => {
+                                console.error("Auth token sign in error", e);
+                                document.getElementById('loading-overlay').textContent = 'Authentication Failed';
+                            });
                         } else {
-                            signInAnonymously(auth).catch(e => console.error("Anonymous sign in error", e));
+                            signInAnonymously(auth).catch(e => {
+                                console.error("Anonymous sign in error", e);
+                                document.getElementById('loading-overlay').textContent = 'Authentication Failed';
+                            });
                         }
                     }
                 });
@@ -1097,7 +1125,7 @@
             } catch (error) {
                 console.error("Firebase initialization failed:", error);
                 showNotification("Application failed to initialize.", "error");
-                document.getElementById('userIdDisplay').textContent = 'Initialization Error';
+                document.getElementById('loading-overlay').textContent = 'Initialization Error';
             }
         }
 
